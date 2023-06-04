@@ -1,0 +1,11 @@
+[package]
+name = "jelly_physics_engine"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+winit = "0.26.1"
+wgpu = "0.9.0"
+piston_window = "0.128.0"
