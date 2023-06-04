@@ -1,20 +1,21 @@
 extern crate piston_window;
 
-use std::io::Write;
 use piston_window::*;
 
 struct Particle {
     position: [f64; 2],
     velocity: [f64; 2],
     mass: f64,
+    is_draggable: bool,
 }
 
 impl Particle {
-    fn new(position: [f64; 2], velocity: [f64; 2], mass: f64) -> Self {
+    fn new(position: [f64; 2], velocity: [f64; 2], mass: f64, is_draggable: bool) -> Self {
         Particle {
             position,
             velocity,
             mass,
+            is_draggable,
         }
     }
 }
@@ -34,7 +35,7 @@ impl Spring {
             particle2_index,
             rest_length,
             stiffness,
-            damping
+            damping,
         }
     }
 }
@@ -42,6 +43,8 @@ impl Spring {
 struct SoftBody {
     particles: Vec<Particle>,
     springs: Vec<Spring>,
+    selected_particle: Option<usize>,
+    previous_mouse_pos: Option<[f64; 2]>,
 }
 
 impl SoftBody {
@@ -49,6 +52,8 @@ impl SoftBody {
         SoftBody {
             particles: Vec::new(),
             springs: Vec::new(),
+            selected_particle: None,
+            previous_mouse_pos: None,
         }
     }
 
@@ -60,7 +65,7 @@ impl SoftBody {
         self.springs.push(spring);
     }
 
-    fn update(&mut self, dt: f64) {
+    fn update(&mut self, dt: f64, window_size: [f64; 2]) {
         let springs = &self.springs;
 
         let mut updated_velocities = vec![[0.0, 0.0]; self.particles.len()];
@@ -102,10 +107,65 @@ impl SoftBody {
 
             particle.position[0] += particle.velocity[0] * dt;
             particle.position[1] += particle.velocity[1] * dt;
+
+            let radius = 5.0;
+
+            if particle.position[0] - radius < 0.0 {
+                particle.position[0] = radius;
+                particle.velocity[0] = -particle.velocity[0];
+            }
+
+            if particle.position[0] + radius > window_size[0] {
+                particle.position[0] = window_size[0] - radius;
+                particle.velocity[0] = -particle.velocity[0];
+            }
+
+            if particle.position[1] - radius < 0.0 {
+                particle.position[1] = radius;
+                particle.velocity[1] = -particle.velocity[1];
+            }
+
+            if particle.position[1] + radius > window_size[1] {
+                particle.position[1] = window_size[1] - radius;
+                particle.velocity[1] = -particle.velocity[1];
+            }
         }
     }
 
-    fn render(&self, e: &Event, g: &mut G2d, c: Context) {
+    fn handle_event(&mut self, e: &Event) {
+        if let Some(pos) = e.mouse_cursor_args() {
+            self.previous_mouse_pos = Some(pos);
+        }
+
+        if let Some(Button::Mouse(MouseButton::Left)) = e.press_args() {
+            if let Some(pos) = self.previous_mouse_pos {
+                self.selected_particle = self
+                    .particles
+                    .iter()
+                    .position(|particle| {
+                        let dx = pos[0] - particle.position[0];
+                        let dy = pos[1] - particle.position[1];
+                        let distance = (dx * dx + dy * dy).sqrt();
+                        distance <= 5.0 && particle.is_draggable
+                    });
+            }
+        }
+
+        if let Some(Button::Mouse(MouseButton::Left)) = e.release_args() {
+            self.selected_particle = None;
+            self.previous_mouse_pos = None;
+        }
+
+        if let Some(pos) = self.previous_mouse_pos {
+            if let Some(selected_particle) = self.selected_particle {
+                if let Some(particle) = self.particles.get_mut(selected_particle) {
+                    particle.position = pos;
+                }
+            }
+        }
+    }
+
+    fn render(&self, g: &mut G2d, c: Context) {
         for particle in &self.particles {
             ellipse(
                 [1.0, 1.0, 1.0, 1.0], // white color
@@ -128,102 +188,59 @@ impl SoftBody {
             );
         }
     }
-
-    fn handle_mouse_drag(&mut self, mouse_x: f64, mouse_y: f64) {
-        let closest_particle_index = self
-            .particles
-            .iter()
-            .enumerate()
-            .min_by(|(_, p1), (_, p2)| {
-                let dx1 = p1.position[0] - mouse_x;
-                let dy1 = p1.position[1] - mouse_y;
-                let dx2 = p2.position[0] - mouse_x;
-                let dy2 = p2.position[1] - mouse_y;
-                (dx1 * dx1 + dy1 * dy1)
-                    .partial_cmp(&(dx2 * dx2 + dy2 * dy2))
-                    .unwrap()
-            })
-            .map(|(index, _)| index);
-
-        if let Some(index) = closest_particle_index {
-            self.particles[index].position = [mouse_x, mouse_y];
-        }
-    }
 }
 
 fn main() {
     let mut window: PistonWindow =
-        WindowSettings::new("Soft Body Engine", [800, 600])
+        WindowSettings::new("Jelly Physics", [800, 600])
             .exit_on_esc(true)
             .build()
             .unwrap();
 
-    let mut soft_body = SoftBody::new();
-
-    // Add particles to the soft body
-    soft_body.add_particle(Particle::new([100.0, 100.0], [0.0, 0.0], 5.0));
-    soft_body.add_particle(Particle::new([100.0, 200.0], [0.0, 0.0], 5.0));
-    soft_body.add_particle(Particle::new([200.0, 100.0], [0.0, 0.0], 5.0));
-    soft_body.add_particle(Particle::new([200.0, 200.0], [0.0, 0.0], 5.0));
-
-    // Add springs connecting the particles
-    soft_body.add_spring(Spring::new(0, 1, 100.0, 0.7, 3.0));
-    soft_body.add_spring(Spring::new(0, 2, 100.0, 0.7, 3.0));
-    soft_body.add_spring(Spring::new(1, 3, 100.0, 0.7, 3.0));
-    soft_body.add_spring(Spring::new(2, 3, 100.0, 0.7, 3.0));
-
-    soft_body.add_spring(Spring::new(0, 3, 141.421, 0.7, 3.0));
-    soft_body.add_spring(Spring::new(2, 1, 141.421, 0.7, 3.0));
-
-    // Square 2
+    let mut soft_body1 = SoftBody::new();
     let mut soft_body2 = SoftBody::new();
 
-    // Add particles to the soft body
-    soft_body2.add_particle(Particle::new([100.0, 100.0], [0.0, 0.0], 5.0));
-    soft_body2.add_particle(Particle::new([100.0, 200.0], [0.0, 0.0], 5.0));
-    soft_body2.add_particle(Particle::new([200.0, 100.0], [0.0, 0.0], 5.0));
-    soft_body2.add_particle(Particle::new([200.0, 200.0], [0.0, 0.0], 5.0));
+    soft_body1.add_particle(Particle::new([200.0, 200.0], [0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([250.0, 200.0], [0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([250.0, 250.0], [0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([200.0, 250.0], [0.0, 0.0], 1.0, true));
 
-    // Add springs connecting the particles
-    soft_body2.add_spring(Spring::new(0, 1, 100.0, 0.7, 3.0));
-    soft_body2.add_spring(Spring::new(0, 2, 100.0, 0.7, 3.0));
-    soft_body2.add_spring(Spring::new(1, 3, 100.0, 0.7, 3.0));
-    soft_body2.add_spring(Spring::new(2, 3, 100.0, 0.7, 3.0));
+    soft_body1.add_spring(Spring::new(0, 1, 50.0, 3.5, 3.0));
+    soft_body1.add_spring(Spring::new(1, 2, 50.0, 3.5, 3.0));
+    soft_body1.add_spring(Spring::new(2, 3, 50.0, 3.5, 3.0));
+    soft_body1.add_spring(Spring::new(3, 0, 50.0, 3.5, 3.0));
+    soft_body1.add_spring(Spring::new(0, 2, 70.7106781187, 8.5, 3.0));
+    soft_body1.add_spring(Spring::new(1, 3, 70.7106781187, 8.5, 3.0));
 
-    soft_body2.add_spring(Spring::new(0, 3, 141.421, 0.7, 3.0));
-    soft_body2.add_spring(Spring::new(2, 1, 141.421, 0.7, 3.0));
+    soft_body2.add_particle(Particle::new([400.0, 200.0], [0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([450.0, 200.0], [0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([450.0, 250.0], [0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([400.0, 250.0], [0.0, 0.0], 1.0, true));
 
-    let mut dragging_particle = false;
+    soft_body2.add_spring(Spring::new(0, 1, 50.0, 3.5, 3.0));
+    soft_body2.add_spring(Spring::new(1, 2, 50.0, 3.5, 3.0));
+    soft_body2.add_spring(Spring::new(2, 3, 50.0, 3.5, 3.0));
+    soft_body2.add_spring(Spring::new(3, 0, 50.0, 3.5, 3.0));
+    soft_body2.add_spring(Spring::new(0, 2, 70.7106781187, 8.5, 3.0));
+    soft_body2.add_spring(Spring::new(1, 3, 70.7106781187, 8.5, 3.0));
 
     while let Some(e) = window.next() {
-        if let Some(args) = e.mouse_cursor_args() {
-            let (mouse_x, mouse_y) = (args[0], args[1]);
-
-            if dragging_particle {
-                soft_body.handle_mouse_drag(mouse_x, mouse_y);
-            }
-        }
-
-        if let Some(Button::Mouse(MouseButton::Left)) = e.press_args() {
-            dragging_particle = true;
-        }
-
-        if let Some(Button::Mouse(MouseButton::Left)) = e.release_args() {
-            dragging_particle = false;
-        }
-
         if let Some(_) = e.update_args() {
             let dt = 0.01;
+            let window_size = [window.size().width as f64, window.size().height as f64];
 
-            soft_body.update(dt);
-            soft_body2.update(dt);
+            soft_body1.update(dt, window_size);
+            soft_body2.update(dt, window_size);
         }
+
+        soft_body1.handle_event(&e);
+        soft_body2.handle_event(&e);
 
         window.draw_2d(&e, |c, g, device| {
             clear([0.5, 0.5, 0.5, 1.0], g);
 
-            soft_body.render(&e, g, c);
-            soft_body2.render(&e, g, c);
+            soft_body1.render(g, c);
+            soft_body2.render(g, c);
         });
     }
 }
