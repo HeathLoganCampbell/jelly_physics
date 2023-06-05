@@ -234,7 +234,7 @@ impl SoftBody {
     }
 
     fn render(&self, g: &mut G2d, c: Context) {
-        let wireframe_mode = false;
+        let wireframe_mode = true;
         if wireframe_mode {
             let mut points = Vec::new();
 
