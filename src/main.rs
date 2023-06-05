@@ -65,6 +65,26 @@ impl SoftBody {
         self.springs.push(spring);
     }
 
+    fn is_inside(&self, other_point: &Particle) -> bool {
+        let points = &self.particles;
+
+        let mut count = 0;
+        for i in 0..points.len() {
+            let current_point = &points[i];
+            let next_point = &points[(i + 1) % points.len()];
+
+            // Check if the line segment intersects the boundary
+            if (current_point.position[1] > other_point.position[1]) != (next_point.position[1] > other_point.position[1]) &&
+                other_point.position[0] < (next_point.position[0] - current_point.position[0]) * (other_point.position[1] - current_point.position[1]) / (next_point.position[1] - current_point.position[1]) + current_point.position[0]
+            {
+                count += 1;
+            }
+        }
+
+        // If the count is odd, the point is inside the boundary
+        count % 2 == 1
+    }
+
     fn update(&mut self, dt: f64, window_size: [f64; 2]) {
         let springs = &self.springs;
 
@@ -167,7 +187,7 @@ impl SoftBody {
 
     fn render(&self, g: &mut G2d, c: Context) {
         let wireframe_mode = true;
-        if (wireframe_mode) {
+        if wireframe_mode {
             let mut points = Vec::new();
 
             for particle in &self.particles {
@@ -252,6 +272,17 @@ fn main() {
 
             soft_body1.render(g, c);
             soft_body2.render(g, c);
+
+            for particle in &soft_body1.particles {
+                if soft_body2.is_inside(particle) {
+                    ellipse(
+                        [1.0, 1.0, 1.0, 1.0], // white color
+                        [particle.position[0] - 5.0, particle.position[1] - 5.0, 10.0, 10.0], // circle position and size
+                        c.transform,
+                        g,
+                    );
+                }
+            }
         });
     }
 }
