@@ -5,15 +5,17 @@ use piston_window::*;
 struct Particle {
     position: [f64; 2],
     velocity: [f64; 2],
+    force: [f64; 2],
     mass: f64,
     is_draggable: bool,
 }
 
 impl Particle {
-    fn new(position: [f64; 2], velocity: [f64; 2], mass: f64, is_draggable: bool) -> Self {
+    fn new(position: [f64; 2], velocity: [f64; 2], force: [f64; 2], mass: f64, is_draggable: bool) -> Self {
         Particle {
             position,
             velocity,
+            force,
             mass,
             is_draggable,
         }
@@ -90,6 +92,11 @@ impl SoftBody {
 
         let mut updated_velocities = vec![[0.0, 0.0]; self.particles.len()];
 
+        for (i, particle) in self.particles.iter_mut().enumerate() {
+            particle.velocity[0] += (updated_velocities[i][0] + particle.force[0] / particle.mass) * dt;
+            particle.velocity[1] += (updated_velocities[i][1] + particle.force[1] / particle.mass) * dt;
+        }
+
         for spring in springs {
             let particle1 = &self.particles[spring.particle1_index];
             let particle2 = &self.particles[spring.particle2_index];
@@ -150,7 +157,45 @@ impl SoftBody {
                 particle.velocity[1] = -particle.velocity[1];
             }
         }
+
+        for particle in self.particles.iter_mut() {
+            particle.force = [0.0, 0.0];
+        }
     }
+
+    fn apply_repulsion(&mut self, other: &Self, repulsion_strength: f64) {
+        for particle in &mut self.particles {
+            if other.is_inside(particle) {
+                // Compute the direction towards the center of the other soft body
+                let other_center = other.compute_center();
+                let direction = [
+                    other_center[0] - particle.position[0],
+                    other_center[1] - particle.position[1],
+                ];
+
+                // Compute the distance and normalize the direction
+                let distance = (direction[0].powi(2) + direction[1].powi(2)).sqrt();
+                let direction = [direction[0] / distance, direction[1] / distance];
+
+                // Apply the repulsion force
+                particle.velocity[0] -= direction[0] * repulsion_strength;
+                particle.velocity[1] -= direction[1] * repulsion_strength;
+            }
+        }
+    }
+
+    fn compute_center(&self) -> [f64; 2] {
+        let mut center = [0.0, 0.0];
+        for particle in &self.particles {
+            center[0] += particle.position[0];
+            center[1] += particle.position[1];
+        }
+
+        center[0] /= self.particles.len() as f64;
+        center[1] /= self.particles.len() as f64;
+        center
+    }
+
 
     fn handle_event(&mut self, e: &Event) {
         if let Some(pos) = e.mouse_cursor_args() {
@@ -231,10 +276,10 @@ fn main() {
     let mut soft_body1 = SoftBody::new();
     let mut soft_body2 = SoftBody::new();
 
-    soft_body1.add_particle(Particle::new([200.0, 200.0], [0.0, 0.0], 1.0, true));
-    soft_body1.add_particle(Particle::new([250.0, 200.0], [0.0, 0.0], 1.0, true));
-    soft_body1.add_particle(Particle::new([250.0, 250.0], [0.0, 0.0], 1.0, true));
-    soft_body1.add_particle(Particle::new([200.0, 250.0], [0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([200.0, 200.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([250.0, 200.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([250.0, 250.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([200.0, 250.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
 
     soft_body1.add_spring(Spring::new(0, 1, 50.0, 3.5, 3.0));
     soft_body1.add_spring(Spring::new(1, 2, 50.0, 3.5, 3.0));
@@ -243,10 +288,10 @@ fn main() {
     soft_body1.add_spring(Spring::new(0, 2, 70.7106781187, 8.5, 3.0));
     soft_body1.add_spring(Spring::new(1, 3, 70.7106781187, 8.5, 3.0));
 
-    soft_body2.add_particle(Particle::new([400.0, 200.0], [0.0, 0.0], 1.0, true));
-    soft_body2.add_particle(Particle::new([450.0, 200.0], [0.0, 0.0], 1.0, true));
-    soft_body2.add_particle(Particle::new([450.0, 250.0], [0.0, 0.0], 1.0, true));
-    soft_body2.add_particle(Particle::new([400.0, 250.0], [0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([400.0, 200.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([450.0, 200.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([450.0, 250.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([400.0, 250.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
 
     soft_body2.add_spring(Spring::new(0, 1, 50.0, 3.5, 3.0));
     soft_body2.add_spring(Spring::new(1, 2, 50.0, 3.5, 3.0));
@@ -259,6 +304,10 @@ fn main() {
         if let Some(_) = e.update_args() {
             let deltat_time = 0.01;
             let window_size = [window.size().width as f64, window.size().height as f64];
+
+            let repulsion_constant = 10.0;
+            soft_body1.apply_repulsion(&mut soft_body2, repulsion_constant);
+            soft_body2.apply_repulsion(&mut soft_body1, repulsion_constant);
 
             soft_body1.update(deltat_time, window_size);
             soft_body2.update(deltat_time, window_size);
