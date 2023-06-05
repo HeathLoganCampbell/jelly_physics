@@ -85,7 +85,6 @@ impl SoftBody {
             }
         }
 
-        // If the count is odd, the point is inside the boundary
         count % 2 == 1
     }
 
@@ -171,7 +170,6 @@ impl SoftBody {
     fn apply_repulsion(&mut self, other: &Self, repulsion_strength: f64) {
         for particle in &mut self.particles {
             if other.is_inside(particle) {
-                // Compute the direction towards the center of the other soft body
                 let other_center = other.compute_center();
                 let direction = [
                     other_center[0] - particle.position[0],
@@ -236,7 +234,7 @@ impl SoftBody {
     }
 
     fn render(&self, g: &mut G2d, c: Context) {
-        let wireframe_mode = true;
+        let wireframe_mode = false;
         if wireframe_mode {
             let mut points = Vec::new();
 
@@ -249,7 +247,7 @@ impl SoftBody {
             for particle in &self.particles {
                 ellipse(
                     [1.0, 1.0, 1.0, 1.0], // white color
-                    [particle.position[0] - 5.0, particle.position[1] - 5.0, 10.0, 10.0], // circle position and size
+                    [particle.position[0] - 5.0, particle.position[1] - 5.0, 10.0, 10.0],
                     c.transform,
                     g,
                 );
@@ -260,9 +258,9 @@ impl SoftBody {
                 let particle2 = &self.particles[spring.particle2_index];
 
                 line(
-                    [1.0, 1.0, 1.0, 1.0], // white color
-                    1.0, // line width
-                    [particle1.position[0], particle1.position[1], particle2.position[0], particle2.position[1]], // line start and end points
+                    [1.0, 1.0, 1.0, 1.0],
+                    1.0,
+                    [particle1.position[0], particle1.position[1], particle2.position[0], particle2.position[1]],
                     c.transform,
                     g,
                 );
@@ -331,7 +329,7 @@ fn main() {
                 if soft_body2.is_inside(particle) {
                     ellipse(
                         [1.0, 1.0, 1.0, 1.0], // white color
-                        [particle.position[0] - 5.0, particle.position[1] - 5.0, 10.0, 10.0], // circle position and size
+                        [particle.position[0] - 5.0, particle.position[1] - 5.0, 10.0, 10.0],
                         c.transform,
                         g,
                     );
