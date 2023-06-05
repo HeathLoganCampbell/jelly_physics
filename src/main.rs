@@ -166,26 +166,37 @@ impl SoftBody {
     }
 
     fn render(&self, g: &mut G2d, c: Context) {
-        for particle in &self.particles {
-            ellipse(
-                [1.0, 1.0, 1.0, 1.0], // white color
-                [particle.position[0] - 5.0, particle.position[1] - 5.0, 10.0, 10.0], // circle position and size
-                c.transform,
-                g,
-            );
-        }
+        let wireframe_mode = true;
+        if (wireframe_mode) {
+            let mut points = Vec::new();
 
-        for spring in &self.springs {
-            let particle1 = &self.particles[spring.particle1_index];
-            let particle2 = &self.particles[spring.particle2_index];
+            for particle in &self.particles {
+                points.push([particle.position[0], particle.position[1]])
+            }
 
-            line(
-                [1.0, 1.0, 1.0, 1.0], // white color
-                1.0, // line width
-                [particle1.position[0], particle1.position[1], particle2.position[0], particle2.position[1]], // line start and end points
-                c.transform,
-                g,
-            );
+            polygon([1.0, 0.0, 0.0, 1.0], &points, c.transform, g);
+        } else {
+            for particle in &self.particles {
+                ellipse(
+                    [1.0, 1.0, 1.0, 1.0], // white color
+                    [particle.position[0] - 5.0, particle.position[1] - 5.0, 10.0, 10.0], // circle position and size
+                    c.transform,
+                    g,
+                );
+            }
+
+            for spring in &self.springs {
+                let particle1 = &self.particles[spring.particle1_index];
+                let particle2 = &self.particles[spring.particle2_index];
+
+                line(
+                    [1.0, 1.0, 1.0, 1.0], // white color
+                    1.0, // line width
+                    [particle1.position[0], particle1.position[1], particle2.position[0], particle2.position[1]], // line start and end points
+                    c.transform,
+                    g,
+                );
+            }
         }
     }
 }
@@ -226,11 +237,11 @@ fn main() {
 
     while let Some(e) = window.next() {
         if let Some(_) = e.update_args() {
-            let dt = 0.01;
+            let deltat_time = 0.01;
             let window_size = [window.size().width as f64, window.size().height as f64];
 
-            soft_body1.update(dt, window_size);
-            soft_body2.update(dt, window_size);
+            soft_body1.update(deltat_time, window_size);
+            soft_body2.update(deltat_time, window_size);
         }
 
         soft_body1.handle_event(&e);
