@@ -6,16 +6,18 @@ struct Particle {
     position: [f64; 2],
     velocity: [f64; 2],
     force: [f64; 2],
+    acceleration: [f64; 2],
     mass: f64,
     is_draggable: bool,
 }
 
 impl Particle {
-    fn new(position: [f64; 2], velocity: [f64; 2], force: [f64; 2], mass: f64, is_draggable: bool) -> Self {
+    fn new(position: [f64; 2], velocity: [f64; 2], force: [f64; 2], acceleration: [f64; 2], mass: f64, is_draggable: bool) -> Self {
         Particle {
             position,
             velocity,
             force,
+            acceleration,
             mass,
             is_draggable,
         }
@@ -92,11 +94,6 @@ impl SoftBody {
 
         let mut updated_velocities = vec![[0.0, 0.0]; self.particles.len()];
 
-        for (i, particle) in self.particles.iter_mut().enumerate() {
-            particle.velocity[0] += (updated_velocities[i][0] + particle.force[0] / particle.mass) * dt;
-            particle.velocity[1] += (updated_velocities[i][1] + particle.force[1] / particle.mass) * dt;
-        }
-
         for spring in springs {
             let particle1 = &self.particles[spring.particle1_index];
             let particle2 = &self.particles[spring.particle2_index];
@@ -158,8 +155,16 @@ impl SoftBody {
             }
         }
 
+        for (i, particle) in self.particles.iter_mut().enumerate() {
+            particle.acceleration[1] = 9.8;
+
+            particle.velocity[0] += (particle.acceleration[0]);
+            particle.velocity[1] += (particle.acceleration[1]);
+        }
+
         for particle in self.particles.iter_mut() {
             particle.force = [0.0, 0.0];
+            particle.acceleration = [0.0, 0.0];
         }
     }
 
@@ -276,10 +281,10 @@ fn main() {
     let mut soft_body1 = SoftBody::new();
     let mut soft_body2 = SoftBody::new();
 
-    soft_body1.add_particle(Particle::new([200.0, 200.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
-    soft_body1.add_particle(Particle::new([250.0, 200.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
-    soft_body1.add_particle(Particle::new([250.0, 250.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
-    soft_body1.add_particle(Particle::new([200.0, 250.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([200.0, 200.0], [0.0, 0.0], [0.0, 0.0],[0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([250.0, 200.0], [0.0, 0.0], [0.0, 0.0],[0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([250.0, 250.0], [0.0, 0.0], [0.0, 0.0],[0.0, 0.0], 1.0, true));
+    soft_body1.add_particle(Particle::new([200.0, 250.0], [0.0, 0.0], [0.0, 0.0],[0.0, 0.0], 1.0, true));
 
     soft_body1.add_spring(Spring::new(0, 1, 50.0, 3.5, 3.0));
     soft_body1.add_spring(Spring::new(1, 2, 50.0, 3.5, 3.0));
@@ -288,10 +293,10 @@ fn main() {
     soft_body1.add_spring(Spring::new(0, 2, 70.7106781187, 8.5, 3.0));
     soft_body1.add_spring(Spring::new(1, 3, 70.7106781187, 8.5, 3.0));
 
-    soft_body2.add_particle(Particle::new([400.0, 200.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
-    soft_body2.add_particle(Particle::new([450.0, 200.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
-    soft_body2.add_particle(Particle::new([450.0, 250.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
-    soft_body2.add_particle(Particle::new([400.0, 250.0], [0.0, 0.0], [0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([400.0, 200.0], [0.0, 0.0], [0.0, 0.0],[0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([450.0, 200.0], [0.0, 0.0], [0.0, 0.0],[0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([450.0, 250.0], [0.0, 0.0], [0.0, 0.0],[0.0, 0.0], 1.0, true));
+    soft_body2.add_particle(Particle::new([400.0, 250.0], [0.0, 0.0], [0.0, 0.0],[0.0, 0.0], 1.0, true));
 
     soft_body2.add_spring(Spring::new(0, 1, 50.0, 3.5, 3.0));
     soft_body2.add_spring(Spring::new(1, 2, 50.0, 3.5, 3.0));
